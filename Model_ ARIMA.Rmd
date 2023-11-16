@@ -1,6 +1,6 @@
 ---
 title: "Model_ ARIMA"
-author: "Jiayi Zhang"
+author: ""
 date: "2023-11-15"
 output: html_document
 ---

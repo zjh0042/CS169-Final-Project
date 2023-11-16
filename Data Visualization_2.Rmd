@@ -1,0 +1,143 @@
+---
+title: "Data Visualization_2"
+author: ""
+date: "2023-11-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+trends_byage <- read.csv("people/trends-byage.csv")
+trends_byage
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+trends_byage$DATE <- as.Date(trends_byage$DATE)
+trends_byage <- filter(trends_byage, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-08-31"))
+trends_long <- melt(trends_byage, id.vars = "DATE", 
+                    measure.vars = grep("COUNT_ADDITIONAL_CUMULATIVE", names(trends_byage), value = TRUE))
+names(trends_long)[names(trends_long) == "variable"] <- "Age_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+
+ggplot(trends_long, aes(x = DATE, y = Cumulative_Count, color = Age_Group)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") + 
+  scale_y_log10() +  
+  labs(title = "Trends of Additional/Booster Doses by Age Group (Aug 2021 - Aug 2022)",
+       x = "Date",
+       y = "Cumulative Count of Additional Doses (Log Scale)") +  
+  theme_minimal() +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+trends_byage$DATE <- as.Date(trends_byage$DATE)
+ggplot(trends_byage, aes(x = DATE, y = CITY_COUNT_ADDITIONAL_CUMULATIVE)) +
+  geom_line() +
+  labs(title = "Trend of City Additional/Booster Doses Over Time",
+       x = "Date",
+       y = "City Cumulative Count of Additional Doses") +
+  theme_minimal()
+```
+
+```{r}
+age_group_columns <- c("COUNT_ADDITIONAL_CUMULATIVE_0_4", "COUNT_ADDITIONAL_CUMULATIVE_5_12", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_13_17", "COUNT_ADDITIONAL_CUMULATIVE_18_24", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_25_34", "COUNT_ADDITIONAL_CUMULATIVE_35_44", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_45_54", "COUNT_ADDITIONAL_CUMULATIVE_55_64", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_65_74", "COUNT_ADDITIONAL_CUMULATIVE_75up")
+trends_byage[age_group_columns] <- lapply(trends_byage[age_group_columns], function(x) as.numeric(as.character(x)))
+trends_byage[is.na(trends_byage)] <- 0
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_0_17 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_0_4 +
+                                                 trends_byage$COUNT_ADDITIONAL_CUMULATIVE_5_12 +
+                                                 trends_byage$COUNT_ADDITIONAL_CUMULATIVE_13_17
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_18_44 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_18_24 +
+                                                  trends_byage$COUNT_ADDITIONAL_CUMULATIVE_25_34 +
+                                                  trends_byage$COUNT_ADDITIONAL_CUMULATIVE_35_44
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_45_64 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_45_54 +
+                                                  trends_byage$COUNT_ADDITIONAL_CUMULATIVE_55_64
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_65_74 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_65_74
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_75up <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_75up
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+trends_byage$DATE <- as.Date(trends_byage$DATE, format = "%Y-%m-%d")
+age_groups <- c("COUNT_ADDITIONAL_CUMULATIVE_0_17", "COUNT_ADDITIONAL_CUMULATIVE_18_44", 
+                "COUNT_ADDITIONAL_CUMULATIVE_45_64", "COUNT_ADDITIONAL_CUMULATIVE_65_74", 
+                "COUNT_ADDITIONAL_CUMULATIVE_75up")
+trends_byage <- filter(trends_byage, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-05-31"))
+trends_long <- melt(trends_byage, id.vars = "DATE", 
+                    measure.vars = age_groups)
+names(trends_long)[names(trends_long) == "variable"] <- "Age_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+
+ggplot(trends_long, aes(x = DATE, y = Cumulative_Count, color = Age_Group)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") + 
+  scale_y_log10() +  
+  labs(title = "Trends of Additional Doses by Age Group",
+       x = "Date",
+       y = "Cumulative Count of Additional Doses (Log Scale)") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+```{r}
+trends_byrace <- read.csv("people/trends-byrace.csv")
+names(trends_byrace)
+```
+
+```{r}
+library(dplyr)
+trends_byrace$DATE <- as.Date(trends_byrace$DATE, format = "%Y-%m-%d")
+trends_byrace <- filter(trends_byrace, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-05-31"))
+race_groups <- c("COUNT_ADDITIONAL_CUMULATIVE_AIAN", "COUNT_ADDITIONAL_CUMULATIVE_ASIAN_NHPI",
+                 "COUNT_ADDITIONAL_CUMULATIVE_BLACK", "COUNT_ADDITIONAL_CUMULATIVE_HISP_LATINO",
+                 "COUNT_ADDITIONAL_CUMULATIVE_WHITE", "COUNT_ADDITIONAL_CUMULATIVE_OTHER")
+trends_long <- melt(trends_byrace, id.vars = "DATE", 
+                    measure.vars = race_groups)
+names(trends_long)[names(trends_long) == "variable"] <- "Race_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+ggplot(trends_long, aes(x = DATE, y = Cumulative_Count, color = Race_Group)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  scale_y_log10() +
+  labs(title = "Trends of Additional Doses by Race Group from August 2021",
+       x = "Date",
+       y = "Cumulative Count of Additional Doses") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+trends_byboro <- read.csv("people/trends-byboro.csv")
+names(trends_byboro)
+```
+
+```{r}
+by_demo <- read.csv("people/coverage-by-demo.csv")
+names(by_demo)
+numerical_data <- by_demo[sapply(by_demo, is.numeric)]
+correlation_matrix <- cor(numerical_data, use = "complete.obs")
+```
