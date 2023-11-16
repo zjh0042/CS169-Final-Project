@@ -1,0 +1,347 @@
+---
+title: "Data Visualization"
+author: ""
+date: "2023-10-02"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library(readr)
+library(knitr)
+```
+
+```{r}
+data_description <- function(df) {
+  cat("First few rows of the data:\n")
+  print(head(df))
+  cat("\n")
+  
+  cat("Statistical summary of the data:\n")
+  print(summary(df))
+  cat("\n")
+  
+  cat("Structure of the data:\n")
+  str(df)
+  cat("\n")
+  
+  cat("Dimensions of the data:\n")
+  print(dim(df))
+  cat("\n")
+  
+  cat("Column names in the data:\n")
+  print(colnames(df))
+  cat("\n")
+}
+```
+
+```{r}
+county_logalpha <- read.csv("county_logalpha.csv")
+data_description(county_logalpha)
+```
+
+```{r}
+names(county_logalpha)[names(county_logalpha) == "county.name"] <- "long_county_name"
+```
+
+```{r}
+covid_county_census_data <- read.csv("covid_county_census_data.csv")
+data_description(covid_county_census_data)
+```
+
+```{r}
+covid_data <- merge(county_logalpha, covid_county_census_data, by = "long_county_name")
+data_description(covid_data)
+```
+
+```{r}
+ny <- covid_data[covid_data$county_name == 'New York', ]
+```
+
+```{r}
+library(ggplot2)
+ggplot(data = ny, aes(x = date, y = death_count)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Time Trend of Deaths in New York County",
+       x = "Date",
+       y = "Deaths") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 5))
+
+```
+
+```{r}
+df <- read.csv('case-hosp-death.csv', header=TRUE)
+data_description(df)
+```
+
+```{r}
+df$t <- c(1:dim(df)[1])
+df$tsquared <- df$t^2
+df$CUM_CASE_COUNT <- cumsum(df$CASE_COUNT)
+```
+
+```{r}
+m1a <- glm(CUM_CASE_COUNT ~ t + tsquared, family=poisson(link="identity"), start=c(1,1,1), data=df)
+summary(m1a)
+ypredm1a <- predict(m1a) 
+
+ggplot(df, aes(x = t, y = CUM_CASE_COUNT)) +
+  geom_point(color='blue') +
+  geom_line(aes(x = t, y = ypredm1a), size = 1, color='green')
+```
+
+```{r}
+m1b <- glm(CASE_COUNT ~ t + tsquared, family=poisson(link="identity"), start=c(1,1,1), data=df)
+summary(m1b)
+
+ypredm1b <- predict(m1b) 
+
+ggplot(df, aes(x = t, y = CASE_COUNT)) +
+  geom_point(color='blue') +
+  geom_line(aes(x = t, y = ypredm1b), size = 1, color='green')
+```
+
+```{r}
+shift <- function(x, n){
+  c(rep(NA, n), x[seq(length(x) - n)])
+}
+
+for (k in c(1:7))
+{
+  colname <- paste0('CASE_MINUS_', k)
+  df[colname]<- shift(df$CASE_COUNT, k)
+}
+
+m2a <- glm(CASE_COUNT ~ CASE_MINUS_1 + CASE_MINUS_2 + 
+             CASE_MINUS_3 + CASE_MINUS_4 + CASE_MINUS_5 + 
+             CASE_MINUS_6 + CASE_MINUS_7, family=poisson(link="identity"), 
+              start=c(1,1,1,1,1,1,1,1), data=df[8:nrow(df),])
+summary(m2a)
+
+ypredm2a <- predict(m2a) 
+
+ggplot(df[8:nrow(df),], aes(x = t, y = CASE_COUNT)) +
+  geom_point(color='blue') +
+  geom_line(aes(x = t, y = ypredm2a), size = 1, color='green')
+```
+
+```{r}
+m2a5 <- glm(CASE_COUNT ~ CASE_MINUS_1 + CASE_MINUS_2 + 
+             CASE_MINUS_3 + CASE_MINUS_4 + CASE_MINUS_5, family=poisson(link="identity"), 
+           start=c(1,1,1,1,1,1), data=df[6:nrow(df),])
+
+summary(m2a5)
+
+ypredm2a5 <- predict(m2a5) 
+
+ggplot(df[6:nrow(df),], aes(x = t, y = CASE_COUNT)) +
+  geom_point(color='blue') +
+  geom_line(aes(x = t, y = ypredm2a5), size = 1, color='green')
+```
+
+```{r}
+m2a3 <- glm(CASE_COUNT ~ CASE_MINUS_1 + CASE_MINUS_2 + 
+              CASE_MINUS_3, family=poisson(link="identity"), 
+            start=c(1,1,1,1), data=df[4:nrow(df),])
+
+summary(m2a3)
+
+ypredm2a3 <- predict(m2a3) 
+
+ggplot(df[4:nrow(df),], aes(x = t, y = CASE_COUNT)) +
+  geom_point(color='blue') +
+  geom_line(aes(x = t, y = ypredm2a3), size = 1, color='green')
+```
+
+```{r}
+#install.packages("readxl")
+```
+
+```{r}
+library(readxl)
+esti_asymptomatic <- read.csv('esti_asymptomatic.csv')
+names(esti_asymptomatic)[names(esti_asymptomatic) == "P.Sev.1...age."] <- "P_Sev_age"
+esti_asymptomatic
+```
+
+```{r}
+categorize_age <- function(age) {
+  if (age %in% c("0-4", "5-10", "11-14")) return("0-17")
+  if (age %in% c("15-19", "20-24", "25-29", "30-34", "35-39", "40-44")) return("18-44")
+  if (age %in% c("45-49", "50-54", "55-59", "60-64")) return("45-64")
+  if (age %in% c("65-69", "70-74")) return("65-74")
+  return("75+")
+}
+
+esti_asymptomatic$Broad_Age_Group <- sapply(esti_asymptomatic$Age, categorize_age)
+
+assign_severity <- function(broad_age) {
+  switch(broad_age,
+         "0-17" = 0.27,
+         "18-44" = 0.75,
+         "45-64" = 0.48,
+         "65-74" = 0.13,
+         "75+" = 0.13)
+}
+
+esti_asymptomatic$Assigned_Sev_Percentage <- sapply(esti_asymptomatic$Broad_Age_Group, assign_severity)
+
+summary_data <- unique(esti_asymptomatic[, c("Broad_Age_Group", "Assigned_Sev_Percentage")])
+colnames(summary_data) <- c("Age Group", "Sev 1 | age")
+
+print(summary_data)
+
+```
+
+```{r}
+#Calculate the total population for each broad age group:
+esti_asymptomatic$Total_Population <- esti_asymptomatic$Male + esti_asymptomatic$Female
+age_group_population <- aggregate(Total_Population ~ Broad_Age_Group, data = esti_asymptomatic, FUN = sum)
+total_population <- sum(esti_asymptomatic$Total_Population)
+#Calculate the total asymptomatic individuals for each broad age group:
+esti_asymptomatic$Asymptomatic_Count <- esti_asymptomatic$PDF.asymp. * esti_asymptomatic$Total_Population
+age_group_asymptomatic <- aggregate(Asymptomatic_Count ~ Broad_Age_Group, data = esti_asymptomatic, FUN = sum)
+#Identify which broad age group has the highest asymptomatic proportion:
+age_group_asymptomatic$Asymptomatic_Proportion <- age_group_asymptomatic$Asymptomatic_Count / total_population
+highest_asymptomatic_group <- age_group_asymptomatic[which.max(age_group_asymptomatic$Asymptomatic_Proportion), "Broad_Age_Group"]
+```
+
+```{r}
+merged_data <- merge(age_group_population, age_group_asymptomatic, by = "Broad_Age_Group")
+
+overall_data <- data.frame(
+  Broad_Age_Group = "Overall",
+  Total_Population = total_population,
+  Asymptomatic_Count = sum(merged_data$Asymptomatic_Count),
+  Asymptomatic_Proportion = sum(merged_data$Asymptomatic_Count) / total_population
+)
+highest_group_data <- data.frame(
+  Broad_Age_Group = "Highest Asymptomatic Group",
+  Total_Population = NA,
+  Asymptomatic_Count = NA,
+  Asymptomatic_Proportion = max(merged_data$Asymptomatic_Proportion)
+)
+
+final_data <- rbind(merged_data, overall_data, highest_group_data)
+
+print(final_data)
+
+```
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+esti_asymptomatic$P_Sev_age <- as.numeric(gsub("%", "", esti_asymptomatic$P_Sev_age)) / 100
+
+# Plotting the distribution of P_Sev_age
+ggplot(data = esti_asymptomatic, aes(x = Age, y = P_Sev_age)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Distribution of P_Sev_age across Age Groups",
+       x = "Age Group",
+       y = "P_Sev_age") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_text(aes(label = scales::percent(P_Sev_age, accuracy = 0.01)), vjust = -0.9, size = 2)
+```
+
+```{r}
+# Plotting PDF for asymptomatic cases
+ggplot(data = esti_asymptomatic, aes(x = Age, y = PDF.asymp.)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "PDF for Asymptomatic Cases across Age Groups",
+       x = "Age Group",
+       y = "Probability Density Function (PDF)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# Plotting CDF for asymptomatic cases
+ggplot(data = esti_asymptomatic, aes(x = Age, y = CDF.asymp., group = 1)) +
+  geom_line(color = "red") +
+  theme_minimal() +
+  labs(title = "CDF for Asymptomatic Cases across Age Groups",
+       x = "Age Group",
+       y = "Cumulative Distribution Function (CDF)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+```{r}
+
+scaling_factor <- max(esti_asymptomatic$PDF.asymp.) / max(esti_asymptomatic$CDF.asymp.)
+
+ggplot(data = esti_asymptomatic, aes(x = Age)) +
+  # Plot PDF.asymp.
+  geom_bar(aes(y = PDF.asymp.), stat = "identity", fill = "steelblue") +
+  
+  # Plot CDF.asymp. scaled by the factor
+  geom_line(aes(y = CDF.asymp. * scaling_factor, group = 1), color = "red") +
+  
+  labs(title = "PDF & CDF for Asymptomatic Cases across Age Groups",
+       x = "Age Group",
+       y = "Probability Density Function (PDF)") +
+  
+  scale_y_continuous(sec.axis = sec_axis(~./scaling_factor, name = "Cumulative Distribution Function (CDF)")) +
+  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+#Calculate the total probability of being asymptomatic in the entire population.
+esti_asymptomatic$Weighted_PDF <- esti_asymptomatic$PDF.asymp. * esti_asymptomatic$Total_Population
+total_probability_asymptomatic <- sum(esti_asymptomatic$Weighted_PDF) / total_population
+```
+
+```{r}
+#Determine the correlation between different variables, e.g., how PDF.asymp. correlates with P_Sev_age across age groups.
+correlation <- cor(esti_asymptomatic$PDF.asymp., esti_asymptomatic$P_Sev_age)
+print(paste("The correlation between PDF.asymp. and P_Sev_age is:", round(correlation, 2)))
+```
+
+```{r}
+ggplot(data = esti_asymptomatic, aes(x = PDF.asymp., y = P_Sev_age)) +
+  geom_point(aes(color = Age)) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") + 
+  theme_minimal() +
+  labs(title = "Correlation between PDF.asymp. and P_Sev_age",
+       x = "PDF.asymp.",
+       y = "P_Sev_age")
+```
+
+```{r}
+library(ggplot2)
+library(tidyr)
+
+long_data <- gather(esti_asymptomatic, key = "Variable", value = "Value", -Age, -Broad_Age_Group, -Assigned_Sev_Percentage)
+
+ggplot(long_data, aes(x = Age, y = Variable, fill = Value)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  labs(title = "Heatmap of Variables across Age Groups") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+
+```
+
