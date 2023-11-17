@@ -1,0 +1,77 @@
+```{r}
+setwd("/Users/jiataizhang/Desktop")
+vac_data <- read.csv("COVID-19_Vaccinations_by_Race_Ethnicity_and_Age_-_ARCHIVED.csv")
+df <- na.omit(vac_data)
+
+```
+
+```{r}
+unique(df$Race.ethnicity)
+unique(df$Age.group)
+unique(df$Vaccination.status)
+
+
+```
+
+
+```{r}
+additional1_data_age <- df[df$Vaccination.status == "Additional 1" & df$Age.group == "All Ages" &df$Date.updated == "02/08/2023", ]
+race_diff_a <- tapply(additional1_data_age$Percent.population, additional1_data_age$Race.ethnicity, mean)
+race_diff_a
+```
+
+
+```{r}
+
+additional1_data_age_15_24 <- df[df$Vaccination.status == "Additional 1" & df$Age.group == "15-24" &df$Date.updated == "02/08/2023", ]
+race_diff_b <- tapply(additional1_data_age_15_24$Percent.population, additional1_data_age_15_24$Race.ethnicity, mean)
+race_diff_b
+
+
+```
+
+
+
+
+```{r}
+Initiated <- df[df$Vaccination.status == "Initiated" & df$Age.group == "All Ages" &df$Date.updated == "02/08/2023", ]
+race_diff_c <- tapply(additional1_data_age$Percent.population, additional1_data_age$Race.ethnicity, mean)
+race_diff_c
+
+```
+
+
+```{r}
+data2<- df[df$Age.group == "All Ages" &df$Date.updated == "02/08/2023", ]
+selected_data <- data2[data2$Vaccination.status %in% c("Additional 1", "Initiated"), ]
+t_test_result <- t.test(Percent.population ~ Vaccination.status, data = selected_data)
+print(t_test_result)
+chisq_test_result <- chisq.test(table(selected_data$Vaccination.status))
+print(chisq_test_result)
+
+```
+
+
+```{R}
+library(nnet)
+# Assuming your data frame is named additional1_data_age
+model_multinom <- multinom(Percent.population ~ Race.ethnicity, data = data2)
+
+# Display model summary
+summary(model_multinom)
+
+```
+
+
+```{R}
+
+selected_data$Vaccination.status <- as.numeric(selected_data$Vaccination.status == "Additional 1")
+model_logistic_race <- glm(Vaccination.status ~ Percent.population +  Race.ethnicity, data = selected_data, family = "binomial")
+summary(model_logistic_race)
+```
+
+
+
+```{R}
+predicted_probabilities<- predict(model_logistic_race, newdata = selected_data, type = "response")
+```
