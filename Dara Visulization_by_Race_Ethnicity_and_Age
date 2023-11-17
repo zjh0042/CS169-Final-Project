@@ -1,0 +1,116 @@
+title: "Dara Visulization by Race, Ethnicity, and Age"
+```{r}
+setwd("/Users/jiataizhang/Desktop")
+vac_data <- read.csv("COVID-19_Vaccinations_by_Race_Ethnicity_and_Age_-_ARCHIVED.csv")
+df <- na.omit(vac_data)
+head(df)
+```
+
+
+```{R}
+library(ggplot2)
+data2 <- df[df$Age.group == "All Ages" &df$Date.updated == "02/08/2023", ]
+ggplot(data = data2, aes(x = Race.ethnicity, y = Percent.population, fill = Vaccination.status)) +
+  geom_col(position = "dodge") +
+  labs(title = " Percent.population",
+       x = "Race",
+       y = "Percent.population",
+       fill = "Vaccination.status") +
+  scale_fill_manual(values = c("Additional 1" = "blue", "Initiated" = "gray", "Fully"="red")) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+```
+
+
+
+```{r}
+additional1_data <- df[df$Vaccination.status == "Additional 1"  &df$Date.updated == "02/08/2023", ]
+library(ggplot2)
+
+ggplot(data = additional1_data, aes(x = Race.ethnicity, y = Percent.population, fill = Age.group)) +
+  geom_col(position = "dodge") +
+  labs(title = " Percent.population",
+       x = "Race",
+       y = "Percent.population",
+       fill = "Age.group")  + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+
+```
+
+```{r}
+additional1_data_age <- df[df$Vaccination.status == "Additional 1" & df$Age.group == "All Ages" &df$Date.updated == "02/08/2023", ]
+library(ggplot2)
+ggplot(additional1_data_age, aes(x = Race.ethnicity, y = Percent.population, fill = Race.ethnicity)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Percentage of Population by Race",
+       x = "Race",
+       y = "Percent Population") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+
+
+```{r}
+additional1_data_age_15_24 <- df[df$Vaccination.status == "Additional 1" & df$Age.group == "15-24" &df$Date.updated == "02/08/2023", ]
+library(ggplot2)
+ggplot(additional1_data_age_15_24, aes(x = Race.ethnicity, y = Percent.population, fill = Race.ethnicity)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Percentage of Population by Race",
+       x = "Race",
+       y = "Percent Population") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+
+
+```{r}
+
+cross_table <- table(additional1_data_age$Race.ethnicity, additional1_data_age$Percent.population)
+
+library(ggplot2)
+
+ggplot(additional1_data, aes(x = Race.ethnicity, y = Percent.population)) +
+  geom_boxplot() +
+  labs(title = "Additional1", x = "race", y = "Percent.population") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+
+
+```
+
+
+
+
+```{r}
+
+cross_table <- table(additional1_data_age_15_24$Race.ethnicity, additional1_data_age_15_24$Percent.population)
+
+library(ggplot2)
+
+ggplot(additional1_data, aes(x = Race.ethnicity, y = Percent.population)) +
+  geom_boxplot() +
+  labs(title = "Additional1", x = "race", y = "Percent.population") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+
+```
+
+
+
+
+
+
+
