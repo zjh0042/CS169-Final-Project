@@ -9,3 +9,5 @@ Dataset Reference:
 Cornell-covid-19 Simulation Model https://github.com/peter-i-frazier/group-testing
 
 Covid-vaccine-data https://github.com/nychealth/covid-vaccine-data
+
+COVID-19 Vaccinations by Race/Ethnicity and Age ：https://data.ct.gov/Health-and-Human-Services/COVID-19-Vaccinations-by-Race-Ethnicity-and-Age-AR/4z97-pa4q
