@@ -1,0 +1,753 @@
+---
+title: "Model_ ARIMA"
+author: ''
+date: "2023-11-15"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r}
+#install.packages("fastDummies")
+#install.packages("randomForest")
+library(ggplot2)
+library(reshape2)
+library(tidyverse)
+library(forecast)
+library(dplyr)
+library(lubridate)
+library(fastDummies)
+library(randomForest)
+```
+
+```{r}
+trends_byage <- read.csv("people/trends-byage.csv")
+trends_byrace <- read.csv("people/trends-byrace.csv")
+trends_byboro <- read.csv("people/trends-byboro.csv")
+coverage_by_demo <- read.csv("people/coverage-by-demo.csv")
+```
+
+```{r}
+trends_byage$DATE <- as.Date(trends_byage$DATE)
+trends_byage <- filter(trends_byage, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-08-31"))
+trends_long <- melt(trends_byage, id.vars = "DATE", 
+                    measure.vars = grep("COUNT_ADDITIONAL_CUMULATIVE", names(trends_byage), value = TRUE))
+names(trends_long)[names(trends_long) == "variable"] <- "Age_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+
+ggplot(trends_long, aes(x = DATE, y = Cumulative_Count, color = Age_Group)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") + 
+  scale_y_log10() +  
+  labs(title = "Trends of Additional/Booster Doses by Age Group (Aug 2021 - Aug 2022)",
+       x = "Date",
+       y = "Cumulative Count of Additional Doses (Log Scale)") +  
+  theme_minimal() +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+age_group_columns <- c("COUNT_ADDITIONAL_CUMULATIVE_0_4", "COUNT_ADDITIONAL_CUMULATIVE_5_12", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_13_17", "COUNT_ADDITIONAL_CUMULATIVE_18_24", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_25_34", "COUNT_ADDITIONAL_CUMULATIVE_35_44", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_45_54", "COUNT_ADDITIONAL_CUMULATIVE_55_64", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_65_74", "COUNT_ADDITIONAL_CUMULATIVE_75up")
+trends_byage[age_group_columns] <- lapply(trends_byage[age_group_columns], function(x) as.numeric(as.character(x)))
+trends_byage[is.na(trends_byage)] <- 0
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_0_17 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_0_4 +
+                                                 trends_byage$COUNT_ADDITIONAL_CUMULATIVE_5_12 +
+                                                 trends_byage$COUNT_ADDITIONAL_CUMULATIVE_13_17
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_18_44 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_18_24 +
+                                                  trends_byage$COUNT_ADDITIONAL_CUMULATIVE_25_34 +
+                                                  trends_byage$COUNT_ADDITIONAL_CUMULATIVE_35_44
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_45_64 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_45_54 +
+                                                  trends_byage$COUNT_ADDITIONAL_CUMULATIVE_55_64
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_65_74 <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_65_74
+
+trends_byage$COUNT_ADDITIONAL_CUMULATIVE_75up <- trends_byage$COUNT_ADDITIONAL_CUMULATIVE_75up
+
+trends_byage$DATE <- as.Date(trends_byage$DATE, format = "%Y-%m-%d")
+age_groups <- c("COUNT_ADDITIONAL_CUMULATIVE_0_17", "COUNT_ADDITIONAL_CUMULATIVE_18_44", 
+                "COUNT_ADDITIONAL_CUMULATIVE_45_64", "COUNT_ADDITIONAL_CUMULATIVE_65_74", 
+                "COUNT_ADDITIONAL_CUMULATIVE_75up")
+trends_byage <- filter(trends_byage, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-05-31"))
+trends_long <- melt(trends_byage, id.vars = "DATE", 
+                    measure.vars = age_groups)
+names(trends_long)[names(trends_long) == "variable"] <- "Age_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+
+ggplot(trends_long, aes(x = DATE, y = Cumulative_Count, color = Age_Group)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") + 
+  scale_y_log10() +  
+  labs(title = "Trends of Additional Doses by Age Group",
+       x = "Date",
+       y = "Cumulative Count of Additional Doses (Log Scale)") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+trends_byrace$DATE <- as.Date(trends_byrace$DATE, format = "%Y-%m-%d")
+trends_byrace <- filter(trends_byrace, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-05-31"))
+race_groups <- c("COUNT_ADDITIONAL_CUMULATIVE_AIAN", "COUNT_ADDITIONAL_CUMULATIVE_ASIAN_NHPI",
+                 "COUNT_ADDITIONAL_CUMULATIVE_BLACK", "COUNT_ADDITIONAL_CUMULATIVE_HISP_LATINO",
+                 "COUNT_ADDITIONAL_CUMULATIVE_WHITE", "COUNT_ADDITIONAL_CUMULATIVE_OTHER")
+trends_long <- melt(trends_byrace, id.vars = "DATE", 
+                    measure.vars = race_groups)
+names(trends_long)[names(trends_long) == "variable"] <- "Race_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+
+ggplot(trends_long, aes(x = DATE, y = Cumulative_Count, color = Race_Group)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  scale_y_log10() +
+  labs(title = "Trends of Additional Doses by Race Group from August 2021",
+       x = "Date",
+       y = "Cumulative Count of Additional Doses") +
+  theme_minimal() +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+***Data Preprocessing***
+
+```{r}
+age_group_columns <- c("COUNT_ADDITIONAL_CUMULATIVE_5_12", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_13_17", "COUNT_ADDITIONAL_CUMULATIVE_18_24", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_25_34", "COUNT_ADDITIONAL_CUMULATIVE_35_44", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_45_54", "COUNT_ADDITIONAL_CUMULATIVE_55_64", 
+                       "COUNT_ADDITIONAL_CUMULATIVE_65_74", "COUNT_ADDITIONAL_CUMULATIVE_75up")
+trends_byage$DATE <- as.Date(trends_byage$DATE)
+trends_byage <- filter(trends_byage, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-08-31"))
+trends_long <- melt(trends_byage, id.vars = "DATE", 
+                    measure.vars = grep("COUNT_ADDITIONAL_CUMULATIVE", names(trends_byage), value = TRUE))
+names(trends_long)[names(trends_long) == "variable"] <- "Age_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+```
+
+```{r}
+for(age_group in age_group_columns) {
+  group_data <- filter(trends_long, Age_Group == age_group)
+  ts_data <- ts(group_data$Cumulative_Count, start=c(start_year, start_month), frequency=12)
+  model <- auto.arima(ts_data)
+  residuals_data <- residuals(model)
+
+  Acf(residuals_data, main = paste("ACF of Residuals for", age_group))
+}
+```
+
+***Age Forecasting Model***
+
+```{r}
+start_year = 2021
+start_month = 8
+
+forecasts = list()
+errors = list()
+
+latest_data_year = 2022
+latest_data_month = 5
+
+future_periods = (2025 - latest_data_year) * 12 + (12 - latest_data_month)
+
+for(age_group in age_group_columns) {
+  group_data <- filter(trends_long, Age_Group == age_group)
+  ts_data <- ts(group_data$Cumulative_Count, start=c(start_year, start_month), frequency=12)
+  error <- tsCV(ts_data, forecastfunction = function(x) forecast(auto.arima(x), h=1), h=1)
+  errors[[age_group]] <- error
+  model <- auto.arima(ts_data)
+  forecast_data <- forecast(model, h=future_periods)
+  forecasts[[age_group]] <- forecast_data
+}
+
+```
+
+***Age Forecasting Result***
+
+```{r}
+for(i in 1:length(forecasts)) {
+  age_group <- names(forecasts)[i]
+  forecast_data <- forecasts[[age_group]]
+
+  historical_data <- filter(trends_long, Age_Group == age_group) %>%
+                     select(Date = DATE, Count = Cumulative_Count) %>%
+                     mutate(Type = "Historical")
+
+  forecast_dates <- seq(from = as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) %m+% months(1), 
+                        length.out = length(forecast_data$mean), 
+                        by = "month")
+  
+  forecast_df <- data.frame(Date = forecast_dates, 
+                            Count = forecast_data$mean, 
+                            Type = "Forecasted")
+
+  combined_df <- rbind(historical_data, forecast_df)
+
+  p <- ggplot(combined_df, aes(x = Date, y = Count, color = Type)) +
+        geom_line() +
+        labs(title = paste("Forecast for Age Group", gsub("COUNT_ADDITIONAL_CUMULATIVE_", "", age_group), "(2021 - 2025)"),
+             x = "Date",
+             y = "Cumulative Count") +
+        theme_minimal() +
+        theme(legend.title = element_blank())
+
+  print(p)
+}
+
+ head(combined_df)
+ tail(combined_df)
+ 
+ 
+ std_dev_combined_df <- sd(combined_df$Count)
+print(std_dev_combined_df)
+```
+
+***Age RMSE*** 
+
+```{r}
+rmse_results <- list()
+
+for(i in 1:length(forecasts)) {
+  age_group <- names(forecasts)[i]
+  forecast_data <- forecasts[[age_group]]
+
+  historical_data <- filter(trends_long, Age_Group == age_group) %>%
+                     select(Date = DATE, Count = Cumulative_Count) %>%
+                     mutate(Type = "Historical")
+
+  forecast_dates <- seq(from = as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) %m+% months(1), 
+                        length.out = length(forecast_data$mean), 
+                        by = "month")
+
+  forecast_df <- data.frame(Date = forecast_dates, 
+                            Count = forecast_data$mean, 
+                            Type = "Forecasted")
+
+  end_date_for_actuals <- as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) - 1
+  actual_values <- historical_data$Count[historical_data$Date <= end_date_for_actuals]
+
+  if (length(actual_values) >= length(forecast_data$mean)) {
+    actual_values <- tail(actual_values, length(forecast_data$mean))
+    forecasted_values <- forecast_data$mean
+
+    rmse <- sqrt(mean((actual_values - forecasted_values)^2, na.rm = TRUE))  
+    rmse_results[[age_group]] <- rmse
+  } else {
+    rmse_results[[age_group]] <- NA  
+  }
+}
+rmse_results
+
+```
+
+***Age Moving Rate***
+
+```{r}
+slopes <- list()
+
+for(i in 1:length(forecasts)) {
+  
+  age_group <- names(forecasts)[i]
+  
+  forecast_data <- forecasts[[age_group]]
+  
+  forecast_dates <- seq(from = as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) %m+% months(1), 
+                        length.out = length(forecast_data$mean), 
+                        by = "month")
+  forecast_df <- data.frame(Date = forecast_dates, 
+                            Count = forecast_data$mean)
+
+  forecast_df$Time <- as.numeric(forecast_df$Date - min(forecast_df$Date))
+  
+  lm_model <- lm(Count ~ Time, data = forecast_df)
+
+  slope <- coef(lm_model)["Time"]
+
+  slopes[[age_group]] <- slope
+}
+
+slopes
+```
+
+***Age Moving Rate Visualization***
+
+```{r}
+slopes_df <- data.frame(
+  AgeGroup = names(slopes),
+  Slope = unlist(slopes)
+)
+
+ggplot(slopes_df, aes(x = AgeGroup, y = Slope, group = 1)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Slope of Forecasted Trends for Each Age Group",
+       x = "Age Group",
+       y = "Potential Willingness") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+***Race Forecasting Model***
+
+```{r}
+trends_byrace$DATE <- as.Date(trends_byrace$DATE, format = "%Y-%m-%d")
+trends_byrace <- filter(trends_byrace, DATE >= as.Date("2021-08-01") & DATE <= as.Date("2022-05-31"))
+race_groups <- c("COUNT_ADDITIONAL_CUMULATIVE_AIAN", "COUNT_ADDITIONAL_CUMULATIVE_ASIAN_NHPI",
+                 "COUNT_ADDITIONAL_CUMULATIVE_BLACK", "COUNT_ADDITIONAL_CUMULATIVE_HISP_LATINO",
+                 "COUNT_ADDITIONAL_CUMULATIVE_WHITE", "COUNT_ADDITIONAL_CUMULATIVE_OTHER")
+trends_long <- melt(trends_byrace, id.vars = "DATE", 
+                    measure.vars = race_groups)
+names(trends_long)[names(trends_long) == "variable"] <- "Race_Group"
+names(trends_long)[names(trends_long) == "value"] <- "Cumulative_Count"
+trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_Count))
+
+for(race_group in race_groups) {
+  ts_data <- ts(filter(trends_long, Race_Group == race_group)$Cumulative_Count, 
+                start=c(start_year, start_month), frequency=12)
+  
+  model <- auto.arima(ts_data)
+  residuals_data <- residuals(model)
+
+  acf_plot <- Acf(residuals_data, main = paste("ACF of Residuals for", race_group))
+  
+  # ggsave(paste("ACF_plot_", race_group, ".png", sep = ""), plot = acf_plot, width = 7, height = 5)
+  
+  print(acf_plot)
+}
+
+start_year = 2021
+start_month = 8
+latest_data_year = 2022
+latest_data_month = 5
+future_periods = (2025 - latest_data_year) * 12 + (12 - latest_data_month)
+
+forecasts = list()
+errors = list()
+
+for(race_group in race_groups) {
+  ts_data <- ts(filter(trends_long, Race_Group == race_group)$Cumulative_Count, 
+                start=c(start_year, start_month), frequency=12)
+  
+  error <- tsCV(ts_data, forecastfunction = function(x) forecast(auto.arima(x), h=1), h=1)
+  errors[[race_group]] <- error
+  
+  model <- auto.arima(ts_data)
+  forecast_data <- forecast(model, h=future_periods)
+  forecasts[[race_group]] <- forecast_data
+}
+
+```
+
+***Race Forecasting Result***
+
+```{r}
+for(i in 1:length(forecasts)) {
+  race_group <- names(forecasts)[i]
+  forecast_data <- forecasts[[i]]
+
+  historical_data <- filter(trends_long, Race_Group == race_group) %>%
+                     select(Date = DATE, Count = Cumulative_Count) %>%
+                     mutate(Type = "Historical")
+
+  forecast_dates <- seq(from = as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) %m+% months(1), 
+                        length.out = length(forecast_data$mean), 
+                        by = "month")
+
+  forecast_df <- data.frame(Date = forecast_dates, 
+                            Count = forecast_data$mean, 
+                            Type = "Forecasted")
+
+  if (all(names(historical_data) == names(forecast_df))) {
+    combined_df <- rbind(historical_data, forecast_df)
+
+    p <- ggplot(combined_df, aes(x = Date, y = Count, color = Type)) +
+          geom_line() +
+          labs(title = paste("Forecast for Race Group", gsub("COUNT_ADDITIONAL_CUMULATIVE_", "", race_group), "(2020 - 2025)"),
+               x = "Date",
+               y = "Cumulative Count") +
+          theme_minimal() +
+          theme(legend.title = element_blank())
+
+    print(p)
+  } else {
+    print(paste("Column mismatch in data frames for race group:", race_group))
+  }
+}
+```
+
+***Race RMSE Result***
+
+```{r}
+rmse_results <- list()
+
+for(i in 1:length(forecasts)) {
+  race_group <- names(forecasts)[i]
+  forecast_data <- forecasts[[i]] 
+
+  historical_data <- filter(trends_long, Race_Group == race_group) %>%
+                     select(Date = DATE, Count = Cumulative_Count) %>%
+                     mutate(Type = "Historical")
+
+  forecast_dates <- seq(from = as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) %m+% months(1), 
+                        length.out = length(forecast_data$mean), 
+                        by = "month")
+
+  forecast_df <- data.frame(Date = forecast_dates, 
+                            Count = forecast_data$mean, 
+                            Type = "Forecasted")
+
+  if (all(names(historical_data) == names(forecast_df))) {
+    combined_df <- rbind(historical_data, forecast_df)
+    
+    end_date_for_actuals <- as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) - 1
+    actual_values <- historical_data$Count[historical_data$Date <= end_date_for_actuals]
+
+    if (length(actual_values) >= length(forecast_data$mean)) {
+      actual_values <- tail(actual_values, length(forecast_data$mean))
+      forecasted_values <- forecast_data$mean
+
+      rmse <- sqrt(mean((actual_values - forecasted_values)^2, na.rm = TRUE))  # na.rm = TRUE to handle missing values
+      rmse_results[[race_group]] <- rmse
+    }
+  }
+}
+
+rmse_results
+
+```
+
+***Age Moving Rate***
+
+```{r}
+slopes <- list()
+
+for(i in 1:length(forecasts)) {
+  group_name <- names(forecasts)[i]
+  forecast_data <- forecasts[[group_name]]
+  forecast_dates <- seq(from = as.Date(paste(latest_data_year, latest_data_month, "01", sep="-")) %m+% months(1), 
+                        length.out = length(forecast_data$mean), 
+                        by = "month")
+  forecast_df <- data.frame(Date = forecast_dates, 
+                            Count = forecast_data$mean)
+  forecast_df$Time <- as.numeric(forecast_df$Date - min(forecast_df$Date))
+  
+  lm_model <- lm(Count ~ Time, data = forecast_df)
+  slope <- coef(lm_model)["Time"]
+  slopes[[group_name]] <- slope
+}
+
+slopes
+```
+
+***Race Moving Rate Visualization***
+
+```{r}
+slopes_df <- data.frame(
+  RaceGroup = names(slopes),
+  Slope = unlist(slopes)
+)
+
+ggplot(slopes_df, aes(x = RaceGroup, y = Slope, group = 1)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Slope of Forecasted Trends for Each Race Group",
+       x = "Race Group",
+       y = "Slope Value") +  # Adjust the y-axis label if needed
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+```{r}
+coverage_by_demo <- read.csv("people/coverage-by-demo.csv")
+head(coverage_by_demo)
+names(coverage_by_demo)
+```
+
+```{r}
+new_dataset <- coverage_by_demo %>% select(COUNT_ADDITIONAL_CUMULATIVE, SUBGROUP, GROUP, POP_DENOMINATOR)
+head(new_dataset)
+```
+
+```{r}
+sorted_dataset <- new_dataset %>% arrange(SUBGROUP)
+sorted_dataset
+```
+
+```{r}
+dummy_data <- sorted_dataset %>%
+  dummy_cols(c("GROUP", "SUBGROUP")) %>%
+  select(-c(GROUP, SUBGROUP))
+
+columns_to_remove <- c(
+  "SUBGROUP_Unknown",
+  "SUBGROUP_Other",
+  "SUBGROUP_Prefer not to answer",
+  "POP_DENOMINATOR",
+  "SUBGROUP_'0-17"
+)
+
+dummy_data <- dummy_data %>%
+  select(-c(`SUBGROUP_Unknown`, `SUBGROUP_Other`, `SUBGROUP_Prefer not to answer`,`POP_DENOMINATOR`,`SUBGROUP_'0-17`))
+
+```
+
+```{r}
+column_name_mapping <- c(
+  "GROUP_Race/ethnicity" = "GROUP_Race_ethnicity",
+  "SUBGROUP_'0-4" = "Age_0_4",
+  "SUBGROUP_'5-12" = "Age_5_12",
+  "SUBGROUP_'13-17" = "Age_13_17",
+  "SUBGROUP_'18-24" = "Age_18_24",
+  "SUBGROUP_'25-34" = "Age_25_34",
+  "SUBGROUP_'35-44" = "Age_35_44",
+  "SUBGROUP_'45-54" = "Age_45_54",
+  "SUBGROUP_'55-64" = "Age_55_64",
+  "SUBGROUP_'65-74" = "Age_65_74",
+  "SUBGROUP_'75-84" = "Age_75_84",
+  "SUBGROUP_'85+" = "Age_85_plus",
+  "SUBGROUP_Asian/NHPI" = "Race_Asian_NHPI",
+  "SUBGROUP_Hispanic/Latino" = "Race_Hispanic_Latino",
+  "SUBGROUP_Native American/Alaska Native" = "Race_Native_American_Alaska_Native",
+  "SUBGROUP_Staten Island" = "Race_Staten_Island",
+  "SUBGROUP_Black" = "Race_Black",
+  "SUBGROUP_White" = "Race_White",
+  "SUBGROUP_Multiracial" = "Race_Multiracial",
+  "SUBGROUP_Female" ="Gender_F",
+  "SUBGROUP_Male" = "Gender_M"
+)
+
+dummy_data <- na.omit(dummy_data)
+colnames(dummy_data) <- sapply(colnames(dummy_data), function(x) {
+  if (x %in% names(column_name_mapping)) {
+    return(column_name_mapping[x])
+  } else {
+    return(x)
+  }
+})
+model <- lm(COUNT_ADDITIONAL_CUMULATIVE ~ ., data = dummy_data)
+summary(model)
+```
+
+```{r}
+colnames(dummy_data) <- gsub("^SUBGROUP_", "", colnames(dummy_data))
+
+rf_model <- randomForest(COUNT_ADDITIONAL_CUMULATIVE ~ ., data = dummy_data)
+importance_data <- as.data.frame(importance(rf_model))
+importance_data <- data.frame(
+  Feature = row.names(importance_data),
+  Importance = importance_data$IncNodePurity
+)
+importance_data_ordered <- importance_data[order(-importance_data$Importance), ]
+print(importance_data)
+print(importance_data_ordered)
+```
+
+```{r}
+    
+age_colors <- c("Age_0_4" = "red","Age_5_12" = "red", 
+                "Age_13_17" = "red", "Age_18_24" = "red", "Age_25_34" = "red", 
+                "Age_35_44" = "red", "Age_45_54" = "red", "Age_55_64" = "red", 
+                "Age_65_74" = "red", "Age_75_84" = "red", "Age_85_plus" = "red")
+
+race_colors <- c("Race_Asian_NHPI" = "green", "Race_Black" = "green", 
+                 "Race_Multiracial" = "green", "Race_Native_American_Alaska_Native" = "green", 
+                 "Race_Hispanic_Latino" = "green", "Race_White" = "green","Race_Staten_Island" = "green")
+
+borough_colors <- c("Bronx" = "orange", "Brooklyn" = "orange", 
+                    "Citywide" = "orange", "Manhattan" = "orange", "Queens" = "orange")
+
+gender_colors <- c("Gender_F" = "pink", "Gender_M" = "pink")
+
+
+
+ggplot(importance_data, aes(x = Feature, y = Importance, fill = Feature)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  labs(x = "Feature", y = "Importance") +
+  ggtitle("Feature Importance with Booster") +
+  scale_fill_manual(values = c(age_colors, race_colors, borough_colors, gender_colors)) +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 4, vjust = 0.5)) + 
+  theme(axis.text.y  = element_text(angle = 0, hjust = 0.5, size = 4, vjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.2, size = 16, face = "bold")) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  coord_flip() + 
+  scale_y_continuous(labels = scales::comma) +
+  theme(
+    plot.background = element_rect(fill = "white"), 
+    plot.title.position = "plot",
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.position = "bottom"  
+  ) +
+  labs(fill = "Feature") +  
+  theme(
+    legend.text = element_text(size = 4), 
+    legend.title = element_text(size = 4, face = "bold")  
+  ) +
+  theme(legend.box = "horizontal")  
+```
+
+```{r}
+#install.packages(c("tm", "stringr", "textclean"))
+#install.packages("wordcloud")
+#install.packages("plotly")
+#install.packages("textdata")
+#install.packages("afinn")
+#install.packages("tidytext")
+#install.packages("treemap")
+```
+
+```{r}
+library(readr)
+library(tm)
+library(stringr)
+library(textclean)
+library(readr)
+library(wordcloud)
+library(tidytext)
+library(dplyr)
+library(treemap)
+library(plotly)
+```
+
+```{r}
+covid <- utils::read.csv("train.csv", sep = "|", stringsAsFactors = FALSE)
+colnames(covid)
+```
+
+```{r}
+age_pattern <- "\\bage\\b|\\byears? old\\b|\\by/o\\b|\\byo\\b|aged"
+covid_pattern <- "\\bcovid\\b|\\bcoronavirus\\b"
+vaccine_pattern <- "\\bvaccine\\b|\\bvaccination\\b|\\bimmunization\\b"
+race_pattern <- "\\bWhite\\b|\\bBlack\\b|\\bAfrican American\\b|\\bAsian\\b|\\bHispanic\\b|\\bLatino\\b"
+usa_pattern <- "\\bUnited States\\b|\\bUSA\\b|\\bAmerica\\b|\\bAmerican\\b"
+```
+
+```{r}
+filtered_data <- covid[with(covid, str_detect(Text, age_pattern) | 
+                                     str_detect(Text, covid_pattern) | 
+                                     str_detect(Text, vaccine_pattern) | 
+                                     str_detect(Text, race_pattern) | 
+                                     str_detect(Text, usa_pattern)), ]
+
+filtered_data
+```
+
+
+```{r}
+corpus <- Corpus(VectorSource(filtered_data$Text))
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeWords, stopwords("en"))
+tokenize <- function(x) {
+  unlist(str_split(x, pattern = " "))
+}
+corpus <- tm_map(corpus, content_transformer(tokenize))
+```
+
+```{r}
+sentiment_data <- data.frame(text = sapply(corpus, as.character))
+```
+
+```{r}
+text_combined <- paste(unlist(corpus), collapse = " ")
+wordcloud_obj <- wordcloud(text_combined, max.words = 100, scale = c(5, 0.5), colors = brewer.pal(8, "Dark2"))
+```
+
+```{r}
+sentiment_data <- sentiment_data %>%
+  unnest_tokens(word, text) %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(word) %>%
+  summarise(sentiment_score = sum(value))
+
+positive_words <- sentiment_data %>%
+  filter(sentiment_score >= 0.5) %>%
+  top_n(50, wt = sentiment_score)
+
+negative_words <- sentiment_data %>%
+  filter(sentiment_score <= 0.5) %>%
+  top_n(50, wt = sentiment_score)
+
+head(negative_words)
+head(positive_words)
+
+```
+
+```{r}
+positive_words <- positive_words[order(-positive_words$sentiment_score), ]
+positive_words
+fig <- plot_ly(
+  labels = positive_words$word,
+  parents = "",
+  values = positive_words$sentiment_score,
+  type = "treemap",
+  path = ~word,
+  ids = ~word,
+  textinfo = "label+value"
+)
+
+fig <- fig %>% layout(
+  title = "50 Most Positive Words",
+  font = list(size = 14),
+  margin = list(l = 0, r = 0, b = 0, t = 40)
+)
+
+fig
+
+```
+
+```{r}
+fig <- plot_ly(
+  labels = negative_words$word,
+  parents = "",
+  values = abs(negative_words$sentiment_score), 
+  type = "treemap"
+)
+
+fig <- fig %>% layout(
+  title = "50 Most Negative Words",
+  font = list(size = 14),
+  margin = list(l = 0, r = 0, b = 0, t = 40)
+)
+
+fig
+```
+
+```{r}
+total_positive_score <- sum(positive_words$sentiment_score)
+total_negative_score <- sum(negative_words$sentiment_score)
+
+threshold_value <- 5
+
+if (total_positive_score - total_negative_score > threshold_value) {
+  overall_sentiment <- "Positive"
+} else if (total_positive_score - total_negative_score < threshold_value) {
+  overall_sentiment <- "Negative"
+} else {
+  overall_sentiment <- "Neutral"
+}
+
+cat("Overall Sentiment:", overall_sentiment, "\n")
+
+```
+
