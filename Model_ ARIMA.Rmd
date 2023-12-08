@@ -3,8 +3,8 @@ title: "Model_ ARIMA"
 author: ''
 date: "2023-11-15"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -144,6 +144,8 @@ trends_long$Cumulative_Count <- as.numeric(as.character(trends_long$Cumulative_C
 ```
 
 ```{r}
+start_year <- 2020  
+start_month <- 1
 for(age_group in age_group_columns) {
   group_data <- filter(trends_long, Age_Group == age_group)
   ts_data <- ts(group_data$Cumulative_Count, start=c(start_year, start_month), frequency=12)
@@ -302,7 +304,7 @@ ggplot(slopes_df, aes(x = AgeGroup, y = Slope, group = 1)) +
        x = "Age Group",
        y = "Potential Willingness") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 
@@ -473,7 +475,7 @@ ggplot(slopes_df, aes(x = RaceGroup, y = Slope, group = 1)) +
        x = "Race Group",
        y = "Slope Value") +  # Adjust the y-axis label if needed
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -650,7 +652,7 @@ filtered_data <- covid[with(covid, str_detect(Text, age_pattern) |
                                      str_detect(Text, race_pattern) | 
                                      str_detect(Text, usa_pattern)), ]
 
-filtered_data
+head(filtered_data)
 ```
 
 
@@ -708,7 +710,7 @@ fig <- plot_ly(
 )
 
 fig <- fig %>% layout(
-  title = "20 Most Positive Words",
+  title = "20 Most Positive Words, Age 15-34, All Race",
   font = list(size = 14),
   margin = list(l = 0, r = 0, b = 0, t = 40)
 )
